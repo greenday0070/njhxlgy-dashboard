@@ -202,12 +202,18 @@ function useShared(path, defaultValue) {
   const [ready, setReady] = useState(false);
   useEffect(() => {
     const r = ref(db, "shared/" + path);
-    const unsub = onValue(r, (snap) => {
-      const v = snap.val();
-      setVal(v === null || v === undefined ? defaultValue : v);
-      setReady(true);
-    });
-    return () => unsub();
+    // Firebase 연결 실패·권한 거부 시에도 대시보드가 멈추지 않도록 타임아웃 폴백
+    const timer = setTimeout(() => setReady(true), 5000);
+    const unsub = onValue(r,
+      (snap) => {
+        const v = snap.val();
+        setVal(v === null || v === undefined ? defaultValue : v);
+        setReady(true);
+        clearTimeout(timer);
+      },
+      () => { setReady(true); clearTimeout(timer); }  // 권한 거부/오류 시 기본값으로 진행
+    );
+    return () => { clearTimeout(timer); unsub(); };
   }, []);
   const save = useCallback((newVal) => {
     setVal(newVal);
