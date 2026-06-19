@@ -142,8 +142,7 @@ function tasksFor(houseKey, idx, isTrip, dateISO) {
 
   if (houseKey === "E46") {
     if (weekday) add("양액분석 (실험실 급액 1처리 · 배액 4처리)-J", "lab", "양액분석 급액1·배액4처리-J");
-    if (wd === 1 || wd === 4) add("생육조사 (생장속도 · 줄기직경 · 엽장 · 엽폭, 생물중)", "survey", "생육조사(생장·직경·엽장폭·생물중)");
-    if (wd === 3) add("건물중 조사 · 식물체 분석의뢰", "survey", "건물중조사·식물체분석의뢰");
+    if (wd === 1 || wd === 4) add("생육조사 (생장속도 · 줄기직경 · 엽장 · 엽폭)", "survey", "생육조사(생장·직경·엽장폭)");
     if (isTrip) add("지상부 사진 촬영 (잎 · 생장점) — 담당연구사 출장", "photo", "지상부 사진(잎·생장점)");
   }
 
@@ -154,9 +153,6 @@ function tasksFor(houseKey, idx, isTrip, dateISO) {
 }
 
 function NOTE_FOR(houseKey, text, idx) {
-  if (houseKey === "E46" && text.startsWith("건물중 조사 · 식물체")) {
-    if (idx === 3) return "※ 목요일은 화요일에 생물중 조사한 시료의 건물중을 조사 후 식물체 분석 의뢰합니다.";
-  }
   return null;
 }
 
@@ -252,8 +248,10 @@ function App() {
 
   const allTrips = useMemo(() => {
     const map = {};
-    const base = Array.isArray(baseTrips) ? baseTrips : [];
-    const custom = Array.isArray(customTrips) ? customTrips : [];
+    // 캘린더(trips_base)에서는 제목에 (BT) 또는 (TW)가 포함된 일정만 가져온다.
+    const base = (Array.isArray(baseTrips) ? baseTrips : [])
+      .filter((t) => t && typeof t.title === "string" && (t.title.includes("(BT)") || t.title.includes("(TW)")));
+    const custom = Array.isArray(customTrips) ? customTrips : [];  // 직접 추가한 출장은 그대로 유지
     [...base, ...custom].forEach((t) => { if (t && t.date) map[t.date] = t; });
     return map;
   }, [baseTrips, customTrips]);
@@ -534,7 +532,7 @@ function HousesView() {
   const detail = {
     W1: ["월·금: 병해충 방제", "화: 생육특성·수량조사 + 양액분석(AT센터 8처리, 실험실 8처리×3반복)", "수: 왜화제 처리(여름~)", "금: 건물중 조사·시료분쇄·식물체 분석의뢰", "매일: 생육·온실 관리, 기록일지, 육묘실/분무경/박막경 점검"],
     E11: ["매일: 작물 생육 및 온실 관리", "기록일지(환경 data·센서)"],
-    E46: ["평일 매일: 양액분석(실험실 급액 1처리·배액 4처리)-J", "화·금: 생육조사(생장속도·줄기직경·엽장·엽폭, 생물중)", "목: 건물중 조사·식물체 분석의뢰", "담당연구사 출장 시: 지상부 사진(잎·생장점)", "이상 시 즉시 담당연구사 연락"],
+    E46: ["평일 매일: 양액분석(실험실 급액 1처리·배액 4처리)-J", "화·금: 생육조사(생장속도·줄기직경·엽장·엽폭)", "담당연구사 출장 시: 지상부 사진(잎·생장점)", "이상 시 즉시 담당연구사 연락"],
   };
   return (
     <div className="space-y-3">
@@ -603,15 +601,6 @@ function RoutineView() {
           )}
         </div>
       ))}
-
-      <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 text-xs text-teal-800 flex items-start gap-2">
-        <Icon n="droplets" size={14} className="mt-0.5 shrink-0" />
-        <div>
-          <b>E4-6 생육조사(생물중) → 건물중·식물체 분석 흐름</b><br />
-          · 생육조사(생물중): <b>화 · 금</b><br />
-          · 목요일: <b>화요일</b> 생물중 조사 시료의 건물중 조사 후 식물체 분석 의뢰
-        </div>
-      </div>
 
       <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-start gap-2">
         <Icon n="beaker" size={14} className="mt-0.5 shrink-0" />
