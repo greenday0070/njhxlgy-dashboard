@@ -166,6 +166,44 @@ const TAG_STYLE = {
   stock:  { c: "bg-amber-100 text-amber-700", label: "재고" },
 };
 
+// 순환식 수경재배 양액 탱크 운영 순서 (출처: 디지털수경재배연구실 · 작성 남주희 연구사)
+const TANK_STEPS = [
+  { step: 1, title: "준비", icon: "clipboard", color: "slate", items: [
+    { n: "①", text: "작물 공급 중단 (관수 시간 변경)" },
+    { n: "②", text: "양액 탱크라인 잠그기" },
+    { n: "③", text: "탱크별 수위 체크·기록" },
+  ]},
+  { step: 2, title: "EC 설정 · 원수 투입", icon: "droplets", color: "sky", items: [
+    { n: "④", text: "원수탱크 EC와 설정값 EC 일치 확인", note: "편차 0.1~0.2 OK" },
+    { n: "⑤", text: "설정값 EC를 원하는 농도로 설정" },
+    { n: "⑥", text: "원수 밸브 OPEN" },
+    { n: "⑦", text: "원수·A/B/C 투입 확인" },
+  ]},
+  { step: 3, title: "목표 EC 도달 · 마감", icon: "beaker", color: "emerald", items: [
+    { n: "⑧", text: "Home" },
+    { n: "⑨", text: "A/B/C 양액 혼합운전중 표시 확인" },
+    { n: "⑩", text: "목표 EC 도달 및 원수탱크 채우기" },
+    { n: "⑪", text: "원수 밸브 잠그기" },
+    { n: "⑫", text: "원수탱크 최종 수위 기록" },
+  ]},
+  { step: 4, title: "양액 처리 · 분배", icon: "flask", color: "violet", items: [
+    { n: "⑬", text: "양액탱크 처리", note: "1·2·3 버리기 / 4번 30% 재활용" },
+    { n: "⑭", text: "양액 분배" },
+    { n: "⑮", text: "원수탱크 남은 수위 + 양액탱크 최종 수위 기록" },
+  ]},
+  { step: 5, title: "복귀 · 확인", icon: "cc", color: "teal", items: [
+    { n: "⑯", text: "관수시간 되돌려두기" },
+    { n: "⑰", text: "작물 양액 공급 확인", warn: "NFT 채널 마름 여부 확인" },
+  ]},
+];
+const TANK_COLOR = {
+  slate:   { band: "bg-slate-100 text-slate-700 border-slate-200", num: "bg-slate-500" },
+  sky:     { band: "bg-sky-100 text-sky-700 border-sky-200", num: "bg-sky-600" },
+  emerald: { band: "bg-emerald-100 text-emerald-800 border-emerald-200", num: "bg-emerald-600" },
+  violet:  { band: "bg-violet-100 text-violet-700 border-violet-200", num: "bg-violet-600" },
+  teal:    { band: "bg-teal-100 text-teal-800 border-teal-200", num: "bg-teal-600" },
+};
+
 const HOUSE_BG = { emerald: "bg-emerald-50 border-emerald-200", lime: "bg-lime-50 border-lime-200", teal: "bg-teal-50 border-teal-200" };
 const HOUSE_ICON = { emerald: "text-emerald-600 bg-emerald-100", lime: "text-lime-600 bg-lime-100", teal: "text-teal-600 bg-teal-100" };
 const HOUSE_BAND = { emerald: "bg-emerald-100 text-emerald-800 border-emerald-200", lime: "bg-lime-100 text-lime-800 border-lime-200", teal: "bg-teal-100 text-teal-800 border-teal-200" };
@@ -283,7 +321,7 @@ function App() {
         </header>
 
         <nav className="flex gap-1 overflow-x-auto pb-2 -mx-1 px-1 sticky top-0 bg-gradient-to-b from-emerald-50/95 to-emerald-50/80 backdrop-blur z-10">
-          {[["today","오늘","sun"],["week","이번 주","clipboard"],["houses","온실별","leaf"],["routine","루틴","clipboard"],["check","체크리스트","cc"],["goal","과제 방향","target"]].map(([k,label,ic]) => (
+          {[["today","오늘","sun"],["week","이번 주","clipboard"],["houses","온실별","leaf"],["routine","루틴","clipboard"],["tank","양액탱크","beaker"],["check","체크리스트","cc"],["goal","과제 방향","target"]].map(([k,label,ic]) => (
             <button key={k} onClick={() => setTab(k)}
               className={`flex items-center gap-1.5 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium transition ${tab===k?"bg-emerald-600 text-white shadow-sm":"bg-white text-slate-600 border border-slate-200 hover:border-emerald-300"}`}>
               <Icon n={ic} size={13} /> {label}
@@ -296,6 +334,7 @@ function App() {
           {tab === "week" && <WeekView {...{weekDays, weekStart, setWeekStart, today, allTrips, checks, toggle, isThisWeek, customTrips, setCustomTrips}} />}
           {tab === "houses" && <HousesView />}
           {tab === "routine" && <RoutineView />}
+          {tab === "tank" && <TankOpsView />}
           {tab === "check" && <ChecklistView />}
           {tab === "goal" && <GoalView {...{direction: directionLocal, setDirection: setDirectionLocal}} />}
         </div>
@@ -609,6 +648,76 @@ function RoutineView() {
           분석의뢰 코드는 <b>'오늘' 탭 하단 생성기</b>를 활용하세요. (예: 260524-진청맛-W1-4-T4)
         </div>
       </div>
+    </div>
+  );
+}
+
+function TankOpsView() {
+  const [done, setDone] = useState({});
+  const total = useMemo(() => TANK_STEPS.reduce((s, st) => s + st.items.length, 0), []);
+  const count = Object.values(done).filter(Boolean).length;
+  const toggle = (k) => setDone((d) => ({ ...d, [k]: !d[k] }));
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-2xl border border-emerald-200 bg-white p-4">
+        <div className="flex items-center gap-2 text-emerald-700">
+          <Icon n="beaker" size={18} />
+          <h2 className="text-sm font-bold">순환식 수경재배 양액 탱크 운영 순서</h2>
+        </div>
+        <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+          STEP 1 → 5 순서대로 진행하세요. 각 항목을 탭하면 완료 체크됩니다. 새 운전을 시작할 땐 <b>초기화</b>를 누르세요.
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-full bg-emerald-500 transition-all" style={{width: `${total?Math.round(count/total*100):0}%`}} />
+          </div>
+          <span className="text-xs font-semibold text-slate-600 shrink-0 tabular-nums">{count}/{total}</span>
+          <button onClick={() => setDone({})} className="text-xs px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-medium shrink-0 hover:bg-slate-200">초기화</button>
+        </div>
+      </div>
+
+      {TANK_STEPS.map((st) => {
+        const c = TANK_COLOR[st.color];
+        return (
+          <div key={st.step} className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
+            <div className={`flex items-center gap-2 px-3 py-2 border-b ${c.band}`}>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-white/70">STEP {st.step}</span>
+              <Icon n={st.icon} size={14} />
+              <span className="text-sm font-bold">{st.title}</span>
+            </div>
+            <ul className="p-3 space-y-1.5">
+              {st.items.map((it) => {
+                const k = `${st.step}-${it.n}`;
+                const dn = !!done[k];
+                return (
+                  <li key={k}>
+                    <button onClick={() => toggle(k)} className="w-full flex items-start gap-2.5 text-left group">
+                      <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold text-white transition ${dn?"bg-emerald-500":c.num}`}>{it.n}</span>
+                      <span className="flex-1 pt-0.5">
+                        <span className={`text-sm ${dn?"line-through text-slate-400":"text-slate-700"}`}>{it.text}</span>
+                        {it.note && <span className="ml-1.5 text-[10px] text-slate-500 bg-slate-100 rounded px-1.5 py-0.5">{it.note}</span>}
+                        {it.warn && <span className="mt-0.5 text-[11px] text-rose-600 font-medium flex items-center gap-1"><Icon n="alert" size={11} /> {it.warn}</span>}
+                      </span>
+                      {dn ? <Icon n="cc" size={17} className="text-emerald-600 mt-0.5 shrink-0" />
+                          : <Icon n="circle" size={17} className="text-slate-300 group-hover:text-emerald-400 mt-0.5 shrink-0" />}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        );
+      })}
+
+      <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 flex items-start gap-2">
+        <Icon n="alert" size={14} className="mt-0.5 shrink-0" />
+        <div><b>마지막 단계</b> — NFT 채널 마름 여부를 <b>매 운전 후 필수 확인</b>하세요.</div>
+      </div>
+
+      <p className="text-[11px] text-slate-400 text-center leading-relaxed">
+        농촌진흥청 국립원예특작과학원 시설원예연구소 디지털수경재배연구실 · 작성: 남주희 연구사
+      </p>
     </div>
   );
 }
